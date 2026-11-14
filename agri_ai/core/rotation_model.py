@@ -316,11 +316,14 @@ def _strategy_explanations(strategy, reference):
 def _remote_sensing_context(con, region, start, end, weather):
     context = {}
     gpm = pd.read_sql_query(
-        "SELECT date, PRECTOTCORR FROM weather WHERE region=? AND source='gpm' AND date BETWEEN ? AND ? ORDER BY date",
+        "SELECT date, PRECTOTCORR, source FROM weather "
+        "WHERE region=? AND source IN ('gpm_gee', 'gpm') AND date BETWEEN ? AND ? "
+        "ORDER BY date, CASE source WHEN 'gpm_gee' THEN 0 ELSE 1 END",
         con,
         params=(region, start, end),
     )
     if len(gpm) >= 30:
+        gpm = gpm.drop_duplicates("date", keep="first").drop(columns="source")
         gpm["date"] = pd.to_datetime(gpm["date"])
         power_weekly = weather.set_index("date")["PRECTOTCORR"].resample("W").sum()
         gpm_weekly = gpm.set_index("date")["PRECTOTCORR"].resample("W").sum()
@@ -330,20 +333,27 @@ def _remote_sensing_context(con, region, start, end, weather):
             context["gpm_power_week_count"] = int(len(paired))
 
     smap = pd.read_sql_query(
-        "SELECT value FROM soil_moisture WHERE region=? AND source='smap' AND kind='smap_surface' AND date BETWEEN ? AND ?",
+        "SELECT value, source, date FROM soil_moisture "
+        "WHERE region=? AND source IN ('smap_gee', 'smap') "
+        "AND kind='smap_surface' AND date BETWEEN ? AND ? "
+        "ORDER BY date, CASE source WHEN 'smap_gee' THEN 0 ELSE 1 END",
         con,
         params=(region, start, end),
     )
     if len(smap):
+        smap = smap.drop_duplicates("date", keep="first")
         context["smap_surface_moisture_m3_m3_median"] = round(float(smap["value"].median()), 3)
         context["smap_observation_count"] = int(len(smap))
 
     modis = pd.read_sql_query(
-        "SELECT ndvi FROM vegetation WHERE region=? AND source='modis' AND date BETWEEN ? AND ?",
+        "SELECT ndvi, source, date FROM vegetation "
+        "WHERE region=? AND source IN ('modis_gee', 'modis') AND date BETWEEN ? AND ? "
+        "ORDER BY date, CASE source WHEN 'modis_gee' THEN 0 ELSE 1 END",
         con,
         params=(region, start, end),
     )
     if len(modis):
+        modis = modis.drop_duplicates("date", keep="first")
         context["modis_ndvi_median"] = round(float(modis["ndvi"].median()), 3)
         context["modis_observation_count"] = int(len(modis))
     return context

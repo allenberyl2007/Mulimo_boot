@@ -17,6 +17,14 @@ Après préparation, le serveur local lit les bases SQLite et modèles ONNX du p
 L'interface utilisateur est en anglais et utilise les six villes comme **points de référence**, pas comme six macro-régions ni comme mesures de parcelles.
 Les rendements restent des estimations de modèles entraînés sur des simulations : cette interface est un prototype de hackathon et ne constitue pas un conseil agricole validé.
 
+## Mise à jour trimestrielle des données (Windows)
+La démonstration continue à utiliser sa base locale sans Internet. Pour actualiser les données lorsqu'une connexion est disponible, double-cliquer une fois sur `Installer_maj_trimestrielle.bat`. La tâche Windows vérifie chaque jour à 09:00 si 90 jours se sont écoulés depuis la dernière mise à jour complète; elle reprend aussi une exécution manquée lorsque l'ordinateur était éteint ou hors ligne, et réessaie les échecs.
+Chaque actualisation complète met à jour NASA POWER, SoilGrids, SMAP, MODIS NDVI et GPM pour les six villes, ainsi que FAOSTAT. Les données météo sont récupérées sur dix ans au premier téléchargement; les observations satellitaires sur trois ans; les actualisations suivantes reprennent une fenêtre récente pour corriger les dernières valeurs sans supprimer l'historique. GPM, MODIS et SMAP sont téléchargés avec le script Earth Engine déjà présent dans le compte Windows (`.copilot/chats/.../donnees_satellites/telecharger_donnees_satellites.py`) et son jeton Google Earth Engine mémorisé. Le projet Cloud utilisé est `braided-facet-513415-e8`; aucune variable ni aucun mot de passe Earthdata n'est demandé. Si le script est déplacé, `EARTH_ENGINE_DOWNLOADER` peut pointer vers son nouvel emplacement. Le package `earthengine-api` doit être installé dans l'environnement du projet.
+Après chaque mise à jour complète, les cinq modèles sont réentraînés en mode supervisé (pas de renforcement / RL), dans des fichiers candidats. Le candidat est comparé au modèle actuel sur le jeu test fixe; il ne le remplace que si aucune cible ne régresse en erreur MAE, R² ou couverture d'intervalle et si au moins une mesure s'améliore. Sinon, le modèle actuel est conservé. Chaque décision est inscrite dans `data/update.log`.
+**Limite importante :** les jeux `ds_main` et `ds_climate` restent des simulations; les nouvelles observations SMAP, MODIS et GPM servent au contrôle externe et ne sont pas des étiquettes d'entraînement. Le réentraînement protège donc les performances mesurées sur le test simulé, mais ne prouve pas une amélioration sur les rendements réels. Pour apprendre des résultats réels, il faudra intégrer des observations appariées de parcelles (culture, récolte, sol et pratiques).
+Avant chaque tentative, une copie vérifiée de `data/simulation.db` est conservée dans `data/backups/` (quatre copies au maximum). Les détails et erreurs sont dans `data/update.log`. Un échec ne valide pas le cycle trimestriel et n'empêche pas la démo d'utiliser les données existantes. Pour lancer une actualisation immédiatement, double-cliquer sur `Mettre_a_jour.bat`; pour supprimer la tâche, exécuter `Unregister-ScheduledTask -TaskName MulimoAgriAiQuarterlyDatabaseUpdate`.
+La tâche s'exécute sous le compte Windows courant quand la session est ouverte. Préparer d'abord le projet et sa base; les mises à jour elles-mêmes nécessitent Internet.
+
 ## Comparateur de rotations
 La démonstration propose aussi une comparaison séparée entre la pratique récente déclarée, une alternance maïs-légumineuse et une rotation diversifiée maïs-légumineuse-manioc. Le nouvel endpoint local `/api/rotations` appelle `core/rotation_model.py`, qui utilise le jumeau numérique existant, la météo journalière NASA POWER hors ligne et le profil de sol local disponible (SoilGrids lorsqu'il existe, sinon archétype).
 
@@ -40,9 +48,9 @@ app.py                       serveur HTTP local et API de démonstration (biblio
 web/index.html               interface responsive en anglais pour les utilisateurs et le jury
 core/                        jumeau numérique (twin, climate, crops, regions, events, features, schema) + comparateur de rotations + db + mlkit (+ policy, decide, explain)
 models/<modèle>/             climate, soil, crop, yield, recommendation : UNIQUEMENT train.py, predict.py, model.onnx
-adapters/                    un adaptateur par source : power, smap, gpm, modis, soilgrids, faostat
+adapters/                    adaptateurs des sources : power, earth_engine, smap, gpm, modis, soilgrids, faostat
 data/make_datasets.py        le jumeau numérique génère les datasets (tables ds_* de simulation.db)
-scripts/                     create_db.py, download_all.py, train_all.sh
+scripts/                     create_db.py, download_all.py, update_db.py, install_update_task.ps1, train_all.sh
 audit/                       audit.py (audit automatique), audit_twin.py (jumeau), validate.py (validation scientifique)
 tests/test_adapters.py       tests des adaptateurs sur charges fictives
 reports/                     audit_report.md, validation_report.md, twin_checks.md
@@ -50,7 +58,7 @@ reports/                     audit_report.md, validation_report.md, twin_checks.
 
 ## Base SQLite unique
 Tables : `weather`, `soil`, `soil_moisture`, `vegetation`, `yield_reference`, `crop`, `recommendation` — chacune a une colonne `source`
-(`sim`, `archetype`, `nasa_power`, `gpm`, `smap`, `modis`, `soilgrids`, `faostat`, `literature`).
+(`sim`, `archetype`, `nasa_power`, `gpm`, `gpm_gee`, `smap`, `smap_gee`, `modis`, `modis_gee`, `soilgrids`, `faostat`, `literature`).
 Les datasets d'entraînement produits par le jumeau (`ds_main`, `ds_climate`) sont rangés dans la **même** base (interprétation de « une seule base »).
 Le dossier de chaque modèle ne contient que 3 fichiers : les métadonnées (variables, diagnostics, calibration, référence hors-domaine) sont **embarquées dans `model.onnx`**.
 
@@ -63,7 +71,7 @@ python audit/audit_twin.py && python audit/audit.py # audits -> reports/
 ```
 
 ## Passer aux données réelles (sans changer l'architecture)
-1. `python scripts/download_all.py kananga 2015-01-01 2024-12-31` (Internet ; SMAP/MODIS : `EARTHDATA_USER`, `EARTHDATA_PASS`) remplit la base.
+1. `python scripts/download_all.py kananga 2015-01-01 2024-12-31` (Internet; les capteurs satellitaires utilisent le compte Earth Engine déjà authentifié et son projet Cloud) remplit la base pour Kananga. Le script satellitaire récupère les six villes, mais seule la région choisie est enregistrée par cette commande.
 2. `python audit/validate.py` produit calibration et validation externe (« NON RÉALISÉE » tant que les lignes réelles manquent).
 3. Ajuster `core/regions.py` (normales) selon le rapport de calibration, relancer `make_datasets.py` puis `train_all.sh`.
 4. `python main.py --mode real ...` lit en priorité `nasa_power` / `soilgrids`, puis le simulé.

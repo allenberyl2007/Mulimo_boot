@@ -68,4 +68,5 @@ with tempfile.TemporaryDirectory() as t:
     finally:
         con.close()
 print(f"\n{sum(1 for _, c in ok if c)}/{len(ok)} tests adaptateurs OK")
-sys.exit(0 if all(c for _, c in ok) else 1)
+if __name__ == "__main__":
+    sys.exit(0 if all(c for _, c in ok) else 1)

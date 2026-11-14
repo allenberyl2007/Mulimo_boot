@@ -51,7 +51,8 @@ def validate_weather(df: pd.DataFrame) -> dict:
     rep["n_nan"] = int(df[WEATHER_COLS].isna().sum().sum())
     rep["tmax_lt_tmin"] = int((df["T2M_MAX"] < df["T2M_MIN"]).sum())
     rep["tmean_outside_minmax"] = int(((df["T2M"] > df["T2M_MAX"] + 1e-6) | (df["T2M"] < df["T2M_MIN"] - 1e-6)).sum())
-    rep["ok"] = (sum(out_of_range.values()) + rep["n_nan"] + rep["tmax_lt_tmin"]) == 0
+    rep["ok"] = (sum(out_of_range.values()) + rep["n_nan"] + rep["tmax_lt_tmin"]
+                 + rep["tmean_outside_minmax"]) == 0
     return rep
 
 
