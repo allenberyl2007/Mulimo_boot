@@ -1,0 +1,15 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.jj": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/c:\\Users\\admin\\Desktop\\rapport_concours.aux": true,
+        "**/c:\\Users\\admin\\Desktop\\rapport_concours.log": true,
+        "**/c:\\Users\\admin\\Desktop\\rapport_concours.gz": true,
+        "**/c:\\Users\\admin\\Desktop\\rapport_concours.out": true
+    }
+}

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7ef">
+  <title>Farm Decision Support — DRC</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #20342b;
+      --muted: #64746a;
+      --green: #2f6848;
+      --green-dark: #214c35;
+      --lime: #d7ed9b;
+      --paper: #fffefa;
+      --line: #e2e8dd;
+      --soft: #f3f6ec;
+      --warning: #fff5dc;
+      --warning-ink: #72541b;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f5f7ef;
+      line-height: 1.5;
+    }
+    button, input, select { font: inherit; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1080px;
+      margin: auto;
+      padding: 22px 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; }
+    .brand-mark {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border-radius: 14px;
+      color: #fff;
+      background: var(--green);
+      font-size: 21px;
+    }
+    .top-note { color: var(--muted); font-size: .9rem; }
+    main { max-width: 1080px; margin: auto; padding: 18px 24px 60px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 58px);
+      border-radius: 28px;
+      color: #fff;
+      background: var(--green-dark);
+    }
+    .hero::after {
+      position: absolute;
+      right: -42px;
+      bottom: -134px;
+      width: 330px;
+      height: 330px;
+      border: 1px solid rgb(255 255 255 / 13%);
+      border-radius: 50%;
+      box-shadow: 0 0 0 34px rgb(255 255 255 / 5%), 0 0 0 70px rgb(255 255 255 / 4%);
+      content: "";
+      pointer-events: none;
+    }
+    .eyebrow { color: var(--lime); font-size: .85rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { max-width: 680px; margin: 12px 0; font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.08; }
+    .hero p { max-width: 570px; margin: 0; color: #e0eadf; font-size: 1.05rem; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .75fr); gap: 22px; margin-top: 24px; align-items: start; }
+    .card { padding: clamp(20px, 4vw, 30px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: 0 10px 30px rgb(38 60 43 / 5%); }
+    .card h2 { margin: 0 0 7px; font-size: 1.35rem; }
+    .intro { margin: 0 0 22px; color: var(--muted); }
+    .field { margin-top: 17px; }
+    label { display: block; margin-bottom: 7px; font-weight: 700; }
+    .hint { margin: 5px 0 0; color: var(--muted); font-size: .85rem; }
+    select, input {
+      width: 100%;
+      min-height: 48px;
+      padding: 11px 13px;
+      border: 1px solid #ccd7ca;
+      border-radius: 11px;
+      color: var(--ink);
+      background: #fff;
+    }
+    select:focus, input:focus, button:focus-visible { outline: 3px solid #8bae69; outline-offset: 2px; }
+    .primary {
+      width: 100%;
+      min-height: 52px;
+      margin-top: 24px;
+      border: 0;
+      border-radius: 13px;
+      color: #fff;
+      background: var(--green);
+      font-weight: 750;
+      cursor: pointer;
+    }
+    .primary:hover { background: var(--green-dark); }
+    .primary:disabled { cursor: wait; opacity: .7; }
+    .notice { margin-top: 20px; padding: 15px 16px; border-radius: 13px; background: var(--soft); color: #46574a; font-size: .9rem; }
+    .notice strong { display: block; margin-bottom: 4px; color: var(--ink); }
+    .result { min-height: 180px; }
+    .result-empty { display: grid; min-height: 170px; place-content: center; text-align: center; color: var(--muted); }
+    .result-empty span { margin-bottom: 8px; font-size: 2rem; }
+    .result-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+    .crop-name { margin: 4px 0 0; font-size: 1.8rem; color: var(--green-dark); }
+    .badge { padding: 6px 10px; border-radius: 999px; background: #e8f1dd; color: #355b39; font-size: .82rem; font-weight: 700; white-space: nowrap; }
+    .yield { margin: 22px 0 4px; font-size: 1.15rem; font-weight: 700; }
+    .small { color: var(--muted); font-size: .9rem; }
+    .result h3 { margin: 22px 0 8px; font-size: 1rem; }
+    ul { padding-left: 21px; }
+    li { margin: 6px 0; }
+    .warnings { margin-top: 18px; padding: 15px 16px; border: 1px solid #f0dfb7; border-radius: 13px; color: var(--warning-ink); background: var(--warning); font-size: .88rem; }
+    .warnings h3 { margin: 0 0 6px; font-size: .95rem; }
+    .warnings ul { margin: 6px 0 0; padding-left: 19px; }
+    .error { margin-top: 14px; padding: 12px; border-radius: 10px; color: #8c2824; background: #fff0ed; }
+    .rotation-section, .rotation-results { margin-top: 22px; }
+    .rotation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 18px; }
+    .rotation-card { padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+    .rotation-card h3 { margin: 0; font-size: 1.05rem; }
+    .rotation-score { margin: 8px 0; color: var(--green-dark); font-size: 1.35rem; font-weight: 750; }
+    .rotation-metrics { padding-left: 0; list-style: none; }
+    .rotation-metrics li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .rotation-details { margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--line); }
+    .rotation-details summary, .method-details summary { color: var(--green-dark); font-weight: 700; cursor: pointer; }
+    .method-details { margin-top: 18px; padding: 15px; border-radius: 13px; background: var(--soft); }
+    .source-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; padding: 0; list-style: none; }
+    .source-list li { padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+    .source-list strong { display: block; }
+    input[type="range"] { min-height: 28px; padding: 0; accent-color: var(--green); }
+    .priority-value { float: right; color: var(--green-dark); font-weight: 700; }
+    [hidden] { display: none !important; }
+    footer { padding: 22px 4px 0; color: var(--muted); text-align: center; font-size: .83rem; }
+    @media (max-width: 760px) {
+      .topbar { padding: 16px 18px; }
+      .top-note { display: none; }
+      main { padding: 12px 16px 40px; }
+      .hero { border-radius: 20px; }
+      .layout { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">+</span><span>Farm Decision Support · DRC</span></div>
+    <span class="top-note">Offline hackathon prototype · runs on this computer</span>
+  </header>
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <div class="eyebrow">Explore ideas for your next growing season</div>
+      <h1 id="page-title">What could you grow in your field?</h1>
+      <p>Choose a reference area and share a few details. The tool compares crop options and explains its estimate. Discuss any decision with a local agricultural adviser.</p>
+    </section>
+
+    <div class="layout">
+      <section class="card" aria-labelledby="form-title">
+        <h2 id="form-title">Tell us about your field</h2>
+        <p class="intro">A few simple questions. You can keep the suggested answers.</p>
+        <form id="advice-form">
+          <div class="field">
+            <label for="region">Which reference city is closest to your field?</label>
+            <select id="region" name="region" required>
+              <option value="mbandaka">Mbandaka</option>
+              <option value="kinshasa">Kinshasa</option>
+              <option value="kananga">Kananga</option>
+              <option value="kisangani">Kisangani</option>
+              <option value="bukavu">Bukavu</option>
+              <option value="lubumbashi">Lubumbashi</option>
+            </select>
+            <p class="hint">These are six city reference points—not measurements from your field.</p>
+          </div>
+          <div class="field">
+            <label for="previous_crop">What did you grow last season?</label>
+            <select id="previous_crop" name="previous_crop">
+              <option value="none">Not sure / another crop</option>
+              <option value="maize">Maize</option>
+              <option value="cassava">Cassava</option>
+              <option value="bean">Beans</option>
+              <option value="groundnut">Groundnuts</option>
+              <option value="rice_upland">Upland rice</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="slope">How steep is your field?</label>
+            <select id="slope" name="slope">
+              <option value="0">Almost flat</option>
+              <option value="5" selected>Slight slope</option>
+              <option value="15">Moderate slope</option>
+              <option value="30">Steep</option>
+            </select>
+            <p class="hint">Choose the option that best describes your land.</p>
+          </div>
+          <button class="primary" id="submit-button" type="submit">Explore crop options</button>
+          <div class="error" id="form-error" role="alert" hidden></div>
+        </form>
+        <div class="notice">
+          <strong>Your information stays on this computer</strong>
+          This prototype does not ask for your name or GPS location, and does not save your answers.
+        </div>
+      </section>
+
+      <section class="card result" id="result" aria-label="Crop comparison results" aria-live="polite">
+        <div class="result-empty" id="empty-state"><span aria-hidden="true">🌱</span><strong>Your crop comparison will appear here</strong><span>Answer the few questions on the left to get started.</span></div>
+        <div id="result-content" hidden>
+          <div class="result-top">
+            <div><div class="eyebrow" style="color:#567b4a">Option to explore</div><h2 class="crop-name" id="crop-name"></h2></div>
+            <span class="badge" id="confidence"></span>
+          </div>
+          <p class="small" id="alternative"></p>
+          <p class="yield" id="yield"></p>
+          <p class="small">Model estimate in tonnes per hectare—not a promise or a measurement of a local harvest.</p>
+          <p class="small">The confidence score reflects model uncertainty and separation between the leading options. It is not the probability of a successful harvest.</p>
+          <h3>Why consider this option?</h3>
+          <ul id="reasons"></ul>
+          <p class="small" id="planning-date"></p>
+          <div class="warnings">
+            <h3>Important limitations</h3>
+            <ul id="caveats"></ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="card rotation-section" aria-labelledby="rotation-title">
+      <h2 id="rotation-title">Compare three crop-rotation strategies</h2>
+      <p class="intro">Compare your recent pattern with two alternatives. The comparison is a simulation—not a forecast or a validated yield recommendation.</p>
+      <form id="rotation-form">
+        <div class="field">
+          <label for="rotation_last_crop">What did you grow last season? (required for the reference strategy)</label>
+          <select id="rotation_last_crop" name="last_crop" required>
+            <option value="" selected disabled>Choose the most recent crop</option>
+            <option value="maize">Maize</option>
+            <option value="cassava">Cassava</option>
+            <option value="bean">Beans</option>
+            <option value="groundnut">Groundnuts</option>
+            <option value="rice_upland">Upland rice</option>
+          </select>
+          <p class="hint">This is the same recent-crop detail used above. Changing either selection updates the other.</p>
+        </div>
+        <div class="field">
+          <label for="crop_before_last">What did you grow the season before last? (optional)</label>
+          <select id="crop_before_last" name="crop_before_last">
+            <option value="none">I do not know / not available</option>
+            <option value="maize">Maize</option>
+            <option value="cassava">Cassava</option>
+            <option value="bean">Beans</option>
+            <option value="groundnut">Groundnuts</option>
+            <option value="rice_upland">Upland rice</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="legume_crop">Which legume should the alternative include?</label>
+          <select id="legume_crop" name="legume_crop">
+            <option value="bean">Beans</option>
+            <option value="groundnut">Groundnuts</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="priority_soil_carbon">How important is soil carbon / organic matter? <output class="priority-value" id="priority_soil_carbon_value">3</output></label>
+          <input id="priority_soil_carbon" name="priority_soil_carbon" type="range" min="0" max="5" value="3">
+        </div>
+        <div class="field">
+          <label for="priority_erosion">How important is reducing erosion? <output class="priority-value" id="priority_erosion_value">3</output></label>
+          <input id="priority_erosion" name="priority_erosion" type="range" min="0" max="5" value="3">
+        </div>
+        <div class="field">
+          <label for="priority_nitrogen">How important is nitrogen fixation? <output class="priority-value" id="priority_nitrogen_value">3</output></label>
+          <input id="priority_nitrogen" name="priority_nitrogen" type="range" min="0" max="5" value="3">
+        </div>
+        <div class="field">
+          <label for="priority_water">How important is water use? <output class="priority-value" id="priority_water_value">3</output></label>
+          <input id="priority_water" name="priority_water" type="range" min="0" max="5" value="3">
+        </div>
+        <div class="field">
+          <label for="priority_food">How important is food energy? <output class="priority-value" id="priority_food_value">3</output></label>
+          <input id="priority_food" name="priority_food" type="range" min="0" max="5" value="3">
+        </div>
+        <p class="hint">Use the crop and field details above. Higher numbers give a goal more weight; set at least one goal above zero. Market value and forage are not scored because reliable local data are not available.</p>
+        <button class="primary" id="rotation-button" type="submit">Compare rotation strategies</button>
+        <div class="error" id="rotation-error" role="alert" hidden></div>
+      </form>
+    </section>
+
+    <section class="card rotation-results" id="rotation-results" aria-live="polite" hidden>
+      <h2>Rotation scenario results</h2>
+      <p class="intro" id="rotation-period"></p>
+      <p class="small" id="baseline-assumption"></p>
+      <p class="small">Relative score (0–100) only ranks these three simulated options under your priorities. It is not a probability, confidence score, or proof of higher harvests.</p>
+      <details class="method-details">
+        <summary>How the scores and indicators are calculated</summary>
+        <p>Every strategy uses the same historical weather, reference soil, slope and assumed management. Only the crop sequence changes. Indicator scores are scaled relative to the three strategies in this comparison.</p>
+        <ul>
+          <li><strong>Soil carbon / organic matter, erosion protection and nitrogen fixation:</strong> each has its own user-selected priority weight.</li>
+          <li><strong>Water:</strong> 75% lower simulated water use and 25% lower simulated crop water stress.</li>
+          <li><strong>Food energy:</strong> estimated crop calories per harvest, not a measure of nutrition, income or food security.</li>
+          <li><strong>Final score:</strong> five indicator scores weighted by the priorities you selected. It only compares these scenarios.</li>
+          <li>The displayed 10th–90th percentile range reflects three different pest-seed simulations; it is not a statistical confidence interval.</li>
+        </ul>
+        <p><strong>Indicator guide:</strong> soil-carbon change estimates organic carbon change over the three simulated crops; erosion estimates modeled soil loss; nitrogen fixation is the twin's estimate for legume crops; disease loss is a modeled crop-loss estimate. Negative carbon change indicates a modeled decline.</p>
+      </details>
+      <div class="rotation-grid" id="rotation-cards"></div>
+      <h3>Historical weather context — not a forecast or climate trend</h3>
+      <p class="small" id="climate-context-note"></p>
+      <ul id="climate-context"></ul>
+      <h3>Data used by the comparison</h3>
+      <ul class="source-list" id="rotation-sources"></ul>
+      <h3>Satellite observations for context only</h3>
+      <p class="small">These observations are not used to rank the strategies and do not validate local harvests.</p>
+      <ul id="satellite-context"></ul>
+      <div class="warnings">
+        <h3>Sources and limitations</h3>
+        <ul id="rotation-limitations"></ul>
+      </div>
+    </section>
+
+    <footer>Experimental tool · yield estimates have not yet been validated against measured harvests in the DRC.</footer>
+  </main>
+  <script>
+    const form = document.getElementById("advice-form");
+    const button = document.getElementById("submit-button");
+    const errorBox = document.getElementById("form-error");
+    const rotationForm = document.getElementById("rotation-form");
+    const rotationButton = document.getElementById("rotation-button");
+    const rotationError = document.getElementById("rotation-error");
+    const recentCrop = form.elements.previous_crop;
+    const rotationRecentCrop = rotationForm.elements.last_crop;
+    const decimal = new Intl.NumberFormat("en-US", {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    const rotationNumber = new Intl.NumberFormat("en-US", {maximumFractionDigits: 2});
+
+    function addItems(list, values) {
+      list.replaceChildren();
+      values.forEach((value) => {
+        const item = document.createElement("li");
+        item.textContent = value;
+        list.append(item);
+      });
+    }
+
+    ["soil_carbon", "erosion", "nitrogen", "water", "food"].forEach((goal) => {
+      const input = rotationForm.elements[`priority_${goal}`];
+      input.addEventListener("input", () => {
+        document.getElementById(`priority_${goal}_value`).value = input.value;
+      });
+    });
+
+    recentCrop.addEventListener("change", () => {
+      rotationRecentCrop.value = recentCrop.value === "none" ? "" : recentCrop.value;
+    });
+    rotationRecentCrop.addEventListener("change", () => {
+      recentCrop.value = rotationRecentCrop.value || "none";
+    });
+
+    function renderRotationComparison(data) {
+      document.getElementById("rotation-results").hidden = false;
+      document.getElementById("rotation-period").textContent =
+        `Reference area: ${data.reference_location} (${data.reference_coordinates.latitude}, ${data.reference_coordinates.longitude}). Three planting years: ${data.planting_years.join(", ")}. Weather used: ${data.weather_period.start} to ${data.weather_period.end}.`;
+      document.getElementById("baseline-assumption").textContent = data.baseline_assumption;
+      const climate = data.historical_climate_context;
+      document.getElementById("climate-context-note").textContent =
+        `Annual NASA POWER values compared with the ${climate.baseline_period} average at this reference point (${climate.complete_baseline_years} complete years). Positive or negative anomalies describe these years only; they do not prove a long-term climate trend.`;
+      const climateItems = climate.years.map((year) =>
+        `${year.year}: ${rotationNumber.format(year.rain_mm)} mm rain (${year.rain_anomaly_mm > 0 ? "+" : ""}${rotationNumber.format(year.rain_anomaly_mm)} mm; ${year.rain_anomaly_pct > 0 ? "+" : ""}${rotationNumber.format(year.rain_anomaly_pct)}% vs. baseline); mean temperature ${rotationNumber.format(year.temperature_mean_c)} °C (${year.temperature_anomaly_c > 0 ? "+" : ""}${rotationNumber.format(year.temperature_anomaly_c)} °C vs. baseline).`
+      );
+      addItems(document.getElementById("climate-context"), climateItems.length
+        ? climateItems
+        : ["Complete annual data were not available to calculate these comparisons."]);
+
+      const cards = document.getElementById("rotation-cards");
+      cards.replaceChildren();
+      data.strategies.forEach((strategy, index) => {
+        const card = document.createElement("article");
+        card.className = "rotation-card";
+        const title = document.createElement("h3");
+        title.textContent = `${index + 1}. ${strategy.name}`;
+        const score = document.createElement("p");
+        score.className = "rotation-score";
+        score.textContent = `Relative score: ${decimal.format(strategy.relative_score)} / 100`;
+        const sequence = document.createElement("p");
+        sequence.className = "small";
+        sequence.textContent = `Three-season sequence: ${strategy.crop_names.join(" → ")}`;
+        const rationale = document.createElement("p");
+        rationale.textContent = strategy.rationale;
+        const metrics = document.createElement("ul");
+        metrics.className = "rotation-metrics";
+        const value = (name, key, unit, range = false) => {
+          const item = document.createElement("li");
+          const metric = strategy.metrics[key];
+          const formatted = range
+            ? `${rotationNumber.format(metric.p10)}–${rotationNumber.format(metric.p90)}`
+            : rotationNumber.format(metric.median);
+          item.textContent = `${name}: ${formatted} ${unit}`;
+          metrics.append(item);
+        };
+        value("Mean yield per season", "yield_t_ha_year", "t/ha", true);
+        value("Food-energy proxy per harvest", "food_energy_mkcal_ha_year", "million kcal/ha");
+        value("Water use", "water_use_mm_year", "mm/year");
+        value("Water stress", "water_stress_pct", "%");
+        value("Soil-carbon change over three crops", "soil_carbon_change_t_ha", "t C/ha");
+        value("Erosion", "erosion_t_ha_year", "t/ha/year");
+        value("Nitrogen fixation", "nitrogen_fixed_kg_ha_year", "kg N/ha/year");
+        value("Simulated disease loss", "disease_loss_pct", "%");
+        const benefitsTitle = document.createElement("strong");
+        benefitsTitle.textContent = "Potential benefits";
+        const benefits = document.createElement("ul");
+        strategy.benefits.forEach((item) => {
+          const entry = document.createElement("li");
+          entry.textContent = item;
+          benefits.append(entry);
+        });
+        const risksTitle = document.createElement("strong");
+        risksTitle.textContent = "Risks and caveats";
+        const risks = document.createElement("ul");
+        strategy.risks.forEach((item) => {
+          const entry = document.createElement("li");
+          entry.textContent = item;
+          risks.append(entry);
+        });
+        const explanation = document.createElement("details");
+        explanation.className = "rotation-details";
+        const explanationSummary = document.createElement("summary");
+        explanationSummary.textContent = "Why this score? Compare with the reference";
+        const explanationContent = document.createElement("div");
+        const scoreBreakdown = document.createElement("ul");
+        strategy.explanations.why_it_ranked.forEach((item) => {
+          const entry = document.createElement("li");
+          entry.textContent = item;
+          scoreBreakdown.append(entry);
+        });
+        const changesTitle = document.createElement("strong");
+        changesTitle.textContent = "Modeled difference from the reference strategy";
+        const changes = document.createElement("ul");
+        const differences = [
+          ["Food-energy proxy per harvest", "food_energy_mkcal_ha_year", "million kcal/ha"],
+          ["Water use per year", "water_use_mm_year", "mm/year"],
+          ["Water-stress indicator", "water_stress_pct", "percentage points"],
+          ["Soil-carbon change over three crops", "soil_carbon_change_t_ha", "t C/ha"],
+          ["Erosion per year", "erosion_t_ha_year", "t/ha/year"],
+          ["Nitrogen fixation per year", "nitrogen_fixed_kg_ha_year", "kg N/ha/year"],
+          ["Simulated disease loss", "disease_loss_pct", "percentage points"]
+        ];
+        differences.forEach(([label, key, unit]) => {
+          const entry = document.createElement("li");
+          const change = strategy.explanations.versus_reference[key];
+          entry.textContent = `${label}: ${change > 0 ? "+" : ""}${rotationNumber.format(change)} ${unit}`;
+          changes.append(entry);
+        });
+        const familyNote = document.createElement("p");
+        familyNote.className = "small";
+        const familyLabels = {
+          cereal: "Cereal",
+          cassava: "Cassava",
+          legume_a: "Legume group A",
+          legume_b: "Legume group B",
+          rice: "Rice"
+        };
+        familyNote.textContent =
+          `Crop-group changes between successive seasons in the twin: ${strategy.explanations.family_changes}. Modeled groups: ${strategy.explanations.crop_families.map((family) => familyLabels[family] || family).join(" → ")}. This is a simple rotation indicator, not a measured pest forecast.`;
+        explanationContent.append(scoreBreakdown, changesTitle, changes, familyNote);
+        explanation.append(explanationSummary, explanationContent);
+        card.append(title, score, sequence, rationale, metrics, benefitsTitle, benefits, risksTitle, risks, explanation);
+        cards.append(card);
+      });
+
+      const sourceList = document.getElementById("rotation-sources");
+      sourceList.replaceChildren();
+      data.data_sources.forEach((source) => {
+        const item = document.createElement("li");
+        const name = document.createElement("strong");
+        name.textContent = `${source.name} — ${source.role}`;
+        const use = document.createElement("span");
+        use.textContent = source.use;
+        item.append(name, use);
+        if (source.period) {
+          const period = document.createElement("span");
+          period.textContent = ` Period: ${source.period.start} to ${source.period.end}.`;
+          item.append(period);
+        }
+        if (source.notes) {
+          const note = document.createElement("span");
+          note.textContent = ` ${source.notes}`;
+          item.append(note);
+        }
+        sourceList.append(item);
+      });
+
+      const evidence = document.getElementById("satellite-context");
+      evidence.replaceChildren();
+      const evidenceLabels = {
+        gpm_weekly_rain_correlation: (value) => `GPM vs. NASA POWER weekly rainfall correlation: ${value} (${data.evidence.gpm_power_week_count} paired weeks).`,
+        smap_surface_moisture_m3_m3_median: (value) => `SMAP median surface soil moisture: ${value} m³/m³ (${data.evidence.smap_observation_count} observations).`,
+        modis_ndvi_median: (value) => `MODIS median vegetation index (NDVI): ${value} (${data.evidence.modis_observation_count} observations).`
+      };
+      Object.entries(evidenceLabels).forEach(([key, describe]) => {
+        if (data.evidence[key] === undefined) return;
+        const item = document.createElement("li");
+        item.textContent = describe(data.evidence[key]);
+        evidence.append(item);
+      });
+      if (!evidence.childElementCount) addItems(evidence, ["No satellite observations were available for this period."]);
+      addItems(document.getElementById("rotation-limitations"), data.limitations);
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      button.disabled = true;
+      button.textContent = "Comparing options…";
+      try {
+        const response = await fetch("/api/recommend", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            region: form.elements.region.value,
+            previous_crop: form.elements.previous_crop.value,
+            slope: form.elements.slope.value
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Something went wrong.");
+
+        document.getElementById("empty-state").hidden = true;
+        document.getElementById("result-content").hidden = false;
+        document.getElementById("crop-name").textContent = data.crop_name_en;
+        document.getElementById("confidence").textContent = `Model confidence: ${Math.round(data.confidence * 100)}%`;
+        document.getElementById("alternative").textContent =
+          `Another option to consider: ${data.alternative_name_en}. Reference area: ${data.reference_location}.`;
+        document.getElementById("yield").textContent =
+          `Indicative yield: ${decimal.format(data.yield_t_ha.low)}–${decimal.format(data.yield_t_ha.high)} t/ha (central estimate: ${decimal.format(data.yield_t_ha.mid)} t/ha)`;
+        document.getElementById("planning-date").textContent =
+          `Historical weather date used by the prototype: ${data.planning_date} (this is not a forecast).`;
+        addItems(document.getElementById("reasons"), data.reasons_en || []);
+        addItems(document.getElementById("caveats"), data.caveats || []);
+      } catch (error) {
+        errorBox.textContent = error.message || "Could not calculate the comparison. Please try again.";
+        errorBox.hidden = false;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Explore crop options";
+      }
+    });
+
+    rotationForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      rotationError.hidden = true;
+      rotationButton.disabled = true;
+      rotationButton.textContent = "Simulating rotations…";
+      try {
+        const response = await fetch("/api/rotations", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            region: form.elements.region.value,
+            last_crop: rotationForm.elements.last_crop.value,
+            crop_before_last: rotationForm.elements.crop_before_last.value,
+            legume_crop: rotationForm.elements.legume_crop.value,
+            slope: form.elements.slope.value,
+            priorities: {
+              soil_carbon: rotationForm.elements.priority_soil_carbon.value,
+              erosion: rotationForm.elements.priority_erosion.value,
+              nitrogen: rotationForm.elements.priority_nitrogen.value,
+              water: rotationForm.elements.priority_water.value,
+              food: rotationForm.elements.priority_food.value
+            }
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not compare the rotations.");
+        renderRotationComparison(data);
+      } catch (error) {
+        rotationError.textContent = error.message || "Could not compare the rotations. Please try again.";
+        rotationError.hidden = false;
+      } finally {
+        rotationButton.disabled = false;
+        rotationButton.textContent = "Compare rotation strategies";
+      }
+    });
+  </script>
+</body>
+</html>
