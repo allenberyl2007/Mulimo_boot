@@ -53,4 +53,8 @@ def load(con, region, lat=None, lon=None):
     r = REGIONS[region]; lat = r.lat if lat is None else lat; lon = r.lon if lon is None else lon
     q = f"{URL}?lon={lon}&lat={lat}&" + "&".join(f"property={p}" for p in PROPS) + "&" + "&".join(f"depth={d}" for d in W) + "&value=mean"
     row = to_soil_row(region, parse(http_json(q)), region)
+    values = [value for key, value in row.items() if key not in ("site", "notes")]
+    if not all(np.isfinite(value) for value in values):
+        raise ValueError(f"SoilGrids returned incomplete or invalid soil data for {region}.")
     put(con, "soil", pd.DataFrame([row]), "soilgrids")
+    return 1

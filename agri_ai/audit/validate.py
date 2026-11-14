@@ -17,19 +17,47 @@ from core.mlkit import read_meta
 
 MIN_ROWS = {"nasa_power_monthly": 120, "nasa_power": 3 * 365, "gpm": 365, "smap": 60, "modis": 24, "soilgrids": 1, "faostat": 20}
 NR = "NON RÉALISÉE — aucune donnée réelle suffisante en base"
+SOURCE_ALIASES = {
+    "gpm": ("gpm_gee", "gpm"),
+    "smap": ("smap_gee", "smap"),
+    "modis": ("modis_gee", "modis"),
+}
 
 
 def n_rows(con, table, source):
-    return con.execute(f"SELECT COUNT(*) FROM {table} WHERE source=?", (source,)).fetchone()[0]
+    sources = SOURCE_ALIASES.get(source, (source,))
+    marks = ",".join("?" * len(sources))
+    return con.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE source IN ({marks})",
+        sources,
+    ).fetchone()[0]
 
 
 def real_weather(con, region, source):
-    d = pd.read_sql_query("SELECT * FROM weather WHERE region=? AND source=? ORDER BY date", con, params=(region, source))
+    sources = SOURCE_ALIASES.get(source, (source,))
+    marks = ",".join("?" * len(sources))
+    order = ", ".join(f"WHEN '{name}' THEN {i}" for i, name in enumerate(sources))
+    d = pd.read_sql_query(
+        f"SELECT * FROM weather WHERE region=? AND source IN ({marks}) "
+        f"ORDER BY date, CASE source {order} ELSE {len(sources)} END",
+        con,
+        params=(region, *sources),
+    )
+    d = d.drop_duplicates("date", keep="first")
     d["date"] = pd.to_datetime(d["date"]); return d
 
 
 def regions_with(con, table, source):
-    return [r[0] for r in con.execute(f"SELECT region FROM {table} WHERE source=? GROUP BY region HAVING COUNT(*)>=?", (source, MIN_ROWS[source]))]
+    sources = SOURCE_ALIASES.get(source, (source,))
+    marks = ",".join("?" * len(sources))
+    return [
+        row[0]
+        for row in con.execute(
+            f"SELECT region FROM {table} WHERE source IN ({marks}) "
+            "GROUP BY region HAVING COUNT(DISTINCT date)>=?",
+            (*sources, MIN_ROWS[source]),
+        )
+    ]
 
 
 def calib_power(con):
@@ -119,7 +147,14 @@ def ext_smap(con):
     for reg in regions_with(con, "soil_moisture", "smap"):
         w = real_weather(con, reg, "nasa_power").dropna()
         if len(w) < 365: continue
-        sm = pd.read_sql_query("SELECT date, value FROM soil_moisture WHERE region=? AND source='smap'", con, params=(reg,)); sm["date"] = pd.to_datetime(sm["date"])
+        sm = pd.read_sql_query(
+            "SELECT date, value, source FROM soil_moisture WHERE region=? "
+            "AND source IN ('smap_gee', 'smap') ORDER BY date, "
+            "CASE source WHEN 'smap_gee' THEN 0 ELSE 1 END",
+            con,
+            params=(reg,),
+        ).drop_duplicates("date", keep="first")
+        sm["date"] = pd.to_datetime(sm["date"])
         soil = REGIONS[reg].soils[0]
         o = DigitalTwin(Site(reg, soil)).run(w.reset_index(drop=True), [], seed=0, trace=True)["trace"]
         o["date"] = w.date.reset_index(drop=True); o["theta"] = o.W1 / 300.0
@@ -133,7 +168,14 @@ def ext_modis(con):
     for reg in regions_with(con, "vegetation", "modis"):
         w = real_weather(con, reg, "nasa_power").dropna()
         if len(w) < 365: continue
-        v = pd.read_sql_query("SELECT date, ndvi FROM vegetation WHERE region=? AND source='modis'", con, params=(reg,)); v["date"] = pd.to_datetime(v["date"])
+        v = pd.read_sql_query(
+            "SELECT date, ndvi, source FROM vegetation WHERE region=? "
+            "AND source IN ('modis_gee', 'modis') ORDER BY date, "
+            "CASE source WHEN 'modis_gee' THEN 0 ELSE 1 END",
+            con,
+            params=(reg,),
+        ).drop_duplicates("date", keep="first")
+        v["date"] = pd.to_datetime(v["date"])
         rain30 = w.set_index("date").PRECTOTCORR.rolling(30).sum().reset_index().rename(columns={"PRECTOTCORR": "rain30"})
         j = v.merge(rain30, on="date").dropna()
         if len(j) > 20: out.append(f"{reg} : corrélation de rang NDVI / pluie 30 j (forçage du jumeau) {spearmanr(j.ndvi, j.rain30)[0]:.2f} — indicateur indirect ; comparaison NDVI/couverture simulée par parcelle : à faire avec des parcelles géoréférencées")

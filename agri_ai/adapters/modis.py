@@ -19,6 +19,10 @@ def parse(text):
 
 def load(con, region, start, end, csv_text=None):
     r = REGIONS[region]
-    text = csv_text or point_csv(r.lat, r.lon, start, end, PRODUCT, LAYER, "ndvi")
-    d = parse(text); d.insert(0, "region", region)
+    text = csv_text if csv_text is not None else point_csv(r.lat, r.lon, start, end, PRODUCT, LAYER, "ndvi")
+    d = parse(text)
+    if d.empty:
+        raise ValueError(f"MODIS returned no usable NDVI data for {region}.")
+    d.insert(0, "region", region)
     put(con, "vegetation", d, "modis")
+    return len(d)

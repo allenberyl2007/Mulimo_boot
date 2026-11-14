@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import numpy as np, pandas as pd
 from core.db import connect, read_weather, put
 from core.schema import WEATHER_COLS
-from adapters import power, gpm, smap, modis, soilgrids, faostat
+from adapters import power, gpm, smap, modis, soilgrids, faostat, earth_engine
 
 ok = []
 def check(name, cond): ok.append((name, bool(cond))); print(("PASS " if cond else "FAIL ") + name)
@@ -67,6 +67,24 @@ with tempfile.TemporaryDirectory() as t:
         check("DB : chaque table garde sa source", all("source" in cols[tb] for tb in ("weather", "soil", "soil_moisture", "vegetation", "yield_reference", "crop", "recommendation")))
     finally:
         con.close()
+
+check("Earth Engine : téléchargeur local inclus", os.path.isfile(earth_engine.DEFAULT_DOWNLOADER))
+previous_downloader = os.environ.pop("EARTH_ENGINE_DOWNLOADER", None)
+try:
+    check("Earth Engine : téléchargeur local résolu par défaut",
+          earth_engine.resolve_downloader() == earth_engine.DEFAULT_DOWNLOADER)
+    with tempfile.TemporaryDirectory() as t:
+        configured_downloader = os.path.join(t, "custom.py")
+        with open(configured_downloader, "w"):
+            pass
+        os.environ["EARTH_ENGINE_DOWNLOADER"] = configured_downloader
+        check("Earth Engine : chemin configuré respecté",
+              earth_engine.resolve_downloader() == os.path.abspath(configured_downloader))
+finally:
+    if previous_downloader is not None:
+        os.environ["EARTH_ENGINE_DOWNLOADER"] = previous_downloader
+    else:
+        os.environ.pop("EARTH_ENGINE_DOWNLOADER", None)
 print(f"\n{sum(1 for _, c in ok if c)}/{len(ok)} tests adaptateurs OK")
 if __name__ == "__main__":
     sys.exit(0 if all(c for _, c in ok) else 1)

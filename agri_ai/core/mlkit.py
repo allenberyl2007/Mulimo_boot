@@ -1,7 +1,7 @@
 """Boîte à outils ML commune aux 5 modèles : entraînement (quantiles 10/50/90 + calibration conforme),
 diagnostics sur/sous-apprentissage, détection hors-domaine, export ONNX (écrit à la main : pas de
 dépendance à `onnx`), prédiction hors ligne (numpy + onnxruntime)."""
-import json, os, struct, time
+import json, os, struct, tempfile, time
 import numpy as np
 import pandas as pd
 
@@ -80,6 +80,61 @@ def _r2(y, p):
     return float(1 - np.sum((y - p) ** 2) / max(np.sum((y - y.mean()) ** 2), 1e-12))
 
 
+def _test_metrics(session, X, targets, y, target_meta):
+    predictions = session.run(None, {"X": X})[0]
+    if predictions.shape != (len(X), 3 * len(targets)):
+        raise ValueError("Model output is incompatible with its target metadata.")
+    metrics = {}
+    for i, target in enumerate(targets):
+        quantiles = np.sort(predictions[:, 3 * i:3 * i + 3], axis=1)
+        actual = y[target]
+        lower = quantiles[:, 0] - target_meta[target]["conformal_c"]
+        upper = quantiles[:, 2] + target_meta[target]["conformal_c"]
+        median = quantiles[:, 1]
+        metrics[target] = {
+            "mae": float(np.mean(np.abs(actual - median))),
+            "r2": _r2(actual, median),
+            "coverage": float(np.mean((actual >= lower) & (actual <= upper))),
+        }
+    return metrics
+
+
+def _promotion_decision(previous, candidate):
+    if previous is None:
+        return True, "initial model", {}
+
+    tolerance = 1e-9
+    details = {}
+    no_regression = True
+    improvement = False
+    for target, new in candidate.items():
+        old = previous[target]
+        coverage_error_old = abs(old["coverage"] - COVER)
+        coverage_error_new = abs(new["coverage"] - COVER)
+        target_no_regression = (
+            new["mae"] <= old["mae"] + tolerance
+            and new["r2"] >= old["r2"] - tolerance
+            and coverage_error_new <= coverage_error_old + tolerance
+        )
+        no_regression = no_regression and target_no_regression
+        improvement = improvement or (
+            new["mae"] < old["mae"] - tolerance
+            or new["r2"] > old["r2"] + tolerance
+            or coverage_error_new < coverage_error_old - tolerance
+        )
+        details[target] = {
+            "mae_change": new["mae"] - old["mae"],
+            "r2_change": new["r2"] - old["r2"],
+            "coverage_error_change": coverage_error_new - coverage_error_old,
+        }
+
+    if not no_regression:
+        return False, "candidate regressed on the fixed test set", details
+    if not improvement:
+        return False, "no measurable improvement on the fixed test set", details
+    return True, "candidate improved without test-set regression", details
+
+
 def _fit_heads(Xtr, ytr, Xva, yva, seed, cfgs=CONFIGS):
     from sklearn.ensemble import GradientBoostingRegressor as G
     best = None
@@ -107,7 +162,7 @@ def _knn_dist(Q, R, k=5, loo=False):
     return np.sqrt(part[:, -1]) if not loo else np.sqrt(part[:, k])
 
 
-def train_model(name, df, features, targets, outdir, units=None, seed=0):
+def _train_model_candidate(name, df, features, targets, outdir, units=None, seed=0):
     """df doit contenir la colonne `split` (train/val/test) ; aucune autre colonne que features/targets n'est lue."""
     t0 = time.time(); rng = np.random.default_rng(seed)
     os.makedirs(outdir, exist_ok=True)
@@ -174,6 +229,62 @@ def train_model(name, df, features, targets, outdir, units=None, seed=0):
                 diagnostics=diag, advice=advise(diag, cvr), seconds=round(time.time() - t0, 1), trained_on=str(df["source"].iloc[0]) if "source" in df else "sim")
     export_onnx(allm, len(features), onnx_path, {"agri_meta": json.dumps(meta, ensure_ascii=False), "agri_ref": ref_b64})
     return meta
+
+
+def train_model(name, df, features, targets, outdir, units=None, seed=0):
+    """Entraîne un candidat et ne remplace le modèle que sans régression mesurée."""
+    os.makedirs(outdir, exist_ok=True)
+    incumbent_path = os.path.join(outdir, "model.onnx")
+    test = df[df.split == "test"]
+    X_test = test[features].to_numpy(np.float32)
+    y_test = {target: test[target].to_numpy(float) for target in targets}
+
+    with tempfile.TemporaryDirectory(prefix=".candidate-", dir=outdir) as candidate_dir:
+        candidate_session = None
+        previous_session = None
+        try:
+            candidate_meta = _train_model_candidate(
+                name, df, features, targets, candidate_dir, units, seed
+            )
+            import onnxruntime as ort
+            candidate_session = ort.InferenceSession(
+                os.path.join(candidate_dir, "model.onnx"),
+                providers=["CPUExecutionProvider"],
+            )
+            candidate_metrics = _test_metrics(
+                candidate_session, X_test, targets, y_test, candidate_meta["target_meta"]
+            )
+
+            if os.path.exists(incumbent_path):
+                previous_meta, previous_session = read_meta(outdir)
+                if previous_meta["features"] != features or previous_meta["targets"] != targets:
+                    promoted = False
+                    reason = "candidate schema differs from the incumbent"
+                    details = {}
+                else:
+                    previous_metrics = _test_metrics(
+                        previous_session, X_test, targets, y_test, previous_meta["target_meta"]
+                    )
+                    promoted, reason, details = _promotion_decision(
+                        previous_metrics, candidate_metrics
+                    )
+            else:
+                promoted, reason, details = _promotion_decision(None, candidate_metrics)
+
+            candidate_meta["promotion"] = {
+                "promoted": promoted,
+                "reason": reason,
+                "test_comparison": details,
+            }
+            candidate_session = None
+            previous_session = None
+            if promoted:
+                os.replace(os.path.join(candidate_dir, "model.onnx"), incumbent_path)
+            print(f"{name} model {'promoted' if promoted else 'retained incumbent'}: {reason}")
+            return candidate_meta
+        finally:
+            candidate_session = None
+            previous_session = None
 
 
 def advise(diag, cvr):

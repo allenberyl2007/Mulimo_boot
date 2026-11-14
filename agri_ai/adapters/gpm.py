@@ -25,6 +25,11 @@ def parse(text):
 
 def load(con, region, start, end, text=None):
     r = REGIONS[region]
-    text = text or urllib.request.urlopen(url_for(r.lat, r.lon, start, end), timeout=300).read().decode()
-    d = parse(text); d.insert(0, "region", region)
+    if text is None:
+        text = urllib.request.urlopen(url_for(r.lat, r.lon, start, end), timeout=300).read().decode()
+    d = parse(text)
+    if d.empty:
+        raise ValueError(f"GPM returned no usable precipitation data for {region}.")
+    d.insert(0, "region", region)
     put(con, "weather", d, "gpm")
+    return len(d)

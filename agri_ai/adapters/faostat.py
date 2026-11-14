@@ -36,4 +36,8 @@ def download():
 
 
 def load(con, df=None):
-    put(con, "yield_reference", parse(download() if df is None else df), "faostat")
+    data = parse(download() if df is None else df)
+    if data.empty:
+        raise ValueError("FAOSTAT returned no yield records for the Democratic Republic of the Congo.")
+    put(con, "yield_reference", data, "faostat")
+    return len(data)

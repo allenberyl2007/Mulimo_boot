@@ -33,6 +33,8 @@ def load(con, region, start, end):
     df, rep = repair_weather(parse(payload, "kWh" if "kW-hr" in units else "MJ"), 5)
     qc = validate_weather(df.dropna())
     d = df.dropna().copy(); d.insert(0, "region", region)
+    if d.empty or not qc["ok"]:
+        raise ValueError(f"NASA POWER returned no usable weather data for {region}: {qc}")
     put(con, "weather", d, "nasa_power")
     return qc
 

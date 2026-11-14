@@ -257,7 +257,10 @@ import tempfile, importlib.util
 sp_ = importlib.util.spec_from_file_location("validate", "audit/validate.py"); val = importlib.util.module_from_spec(sp_); sp_.loader.exec_module(val)
 txt_real = val.build(con)
 ext_lines = [l for l in txt_real.splitlines() if l.startswith("- **") and any(k in l for k in ("GPM", "SMAP", "MODIS"))]
-n_real = sum(con.execute(f"SELECT COUNT(*) FROM {t} WHERE source=?", (s_,)).fetchone()[0] for t, s_ in (("weather", "gpm"), ("soil_moisture", "smap"), ("vegetation", "modis")))
+n_real = sum(
+    con.execute(f"SELECT COUNT(*) FROM {table} WHERE source IN (?, ?)", (f"{source}_gee", source)).fetchone()[0]
+    for table, source in (("weather", "gpm"), ("soil_moisture", "smap"), ("vegetation", "modis"))
+)
 flag(S, "aucune validation externe déclarée sans données réelles (GPM/SMAP/MODIS : « NON RÉALISÉE »)", n_real > 0 or all("NON RÉALISÉE" in l for l in ext_lines), f"lignes réelles en base : {n_real}")
 with tempfile.TemporaryDirectory() as td:       # TEST DU CODE avec des données FACTICES : sans valeur scientifique
     from core.db import put
