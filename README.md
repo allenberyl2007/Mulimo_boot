@@ -23,7 +23,7 @@ Only the user-facing interface is in English for the jury, while documentation a
 
 Once initialized, the local server reads the project's SQLite databases and ONNX models completely offline, transmitting no data to external services. Downloaded databases must be placed in `data/simulation.db` prior to offline demonstration.
 
-The user interface uses the six cities as **reference points**, rather than macro-regions or plot-level measurements.
+The user interface uses the six cities as reference points, rather than macro-regions or plot-level measurements.
 
 Yield figures remain estimations based on models trained on simulations: this interface is a hackathon prototype and does not constitute validated agricultural advice.
 
@@ -75,7 +75,7 @@ Tables: `weather`, `soil`, `soil_moisture`, `vegetation`, `yield_reference`, `cr
 
 Training datasets produced by the digital twin (`ds_main`, `ds_climate`) are stored within the **same** database.
 
-Each model directory contains only 3 files: metadata (variables, diagnostics, calibration, out-of-domain references) are **embedded directly within `model.onnx**`.
+Each model directory contains only 3 files: metadata (variables, diagnostics, calibration, out-of-domain references) are embedded directly within `model.onnx`.
 
 ---
 
