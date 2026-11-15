@@ -75,7 +75,7 @@ Tables: `weather`, `soil`, `soil_moisture`, `vegetation`, `yield_reference`, `cr
 
 Training datasets produced by the digital twin (`ds_main`, `ds_climate`) are stored within the **same** database.
 
-Each model directory contains only 3 files: metadata (variables, diagnostics, calibration, out-of-domain references) are **embedded directly within `model.onnx**`.
+Each model directory contains only 3 files: metadata (variables, diagnostics, calibration, out-of-domain references) are embedded directly within `model.onnx`.
 
 ---
 
