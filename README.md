@@ -23,7 +23,7 @@ Only the user-facing interface is in English for the jury, while documentation a
 
 Once initialized, the local server reads the project's SQLite databases and ONNX models completely offline, transmitting no data to external services. Downloaded databases must be placed in `data/simulation.db` prior to offline demonstration.
 
-The user interface uses the six cities as **reference points**, rather than macro-regions or plot-level measurements.
+The user interface uses the six cities as reference points, rather than macro-regions or plot-level measurements.
 
 Yield figures remain estimations based on models trained on simulations: this interface is a hackathon prototype and does not constitute validated agricultural advice.
 
